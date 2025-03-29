@@ -7,7 +7,10 @@ from werkzeug.utils import secure_filename
 from PIL import Image
 from io import BytesIO
 
-app = Flask(__name__)
+# Set the absolute path to the templates folder
+TEMPLATE_DIR = r"C:\Users\Manas Deshmukh\OneDrive\Desktop\Mac_DIP Project - Copy\templates"
+
+app = Flask(__name__, template_folder=TEMPLATE_DIR)
 
 # Configure Upload Folder
 UPLOAD_FOLDER = "static/uploads"
@@ -108,72 +111,6 @@ def home():
             predicted_category = "❌ Model not loaded properly!"
 
     return render_template("index.html", prediction=predicted_category, image_path=uploaded_image_path)
-
-# Predict API Route (Handles Both File Upload & Live Camera)
-@app.route("/predict", methods=["POST"])
-def predict():
-    if model is None:
-        return jsonify({"error": "❌ Model not loaded properly!"}), 500
-
-    # Check if Base64 Image Data is Sent (from Live Camera)
-    if request.is_json:
-        data = request.get_json()
-        if "image" in data:
-            try:
-                base64_image = data["image"].split(",")[1]  # Remove "data:image/jpeg;base64,"
-                image_data = base64.b64decode(base64_image)
-                
-                # Preprocess Image
-                features = preprocess_image(image_data=image_data)
-                if features is None:
-                    return jsonify({"error": "❌ Image processing failed!"}), 500
-
-                # Make Prediction
-                prediction = model.predict(features)[0]
-
-                # Convert Prediction to Label
-                if isinstance(prediction, str):
-                    predicted_category = prediction
-                elif label_encoder:
-                    predicted_category = label_encoder.inverse_transform([prediction])[0]
-                else:
-                    predicted_category = CATEGORY_MAPPING.get(int(prediction), "Unknown")
-
-                return jsonify({"prediction": predicted_category})
-
-            except Exception as e:
-                return jsonify({"error": f"❌ Error processing image: {e}"}), 500
-
-    # Handle File Uploads (Existing Logic)
-    if "file" not in request.files:
-        return jsonify({"error": "❌ No file uploaded!"}), 400
-
-    file = request.files["file"]
-    if file.filename == "":
-        return jsonify({"error": "❌ No selected file!"}), 400
-
-    # Save Uploaded File
-    filename = secure_filename(file.filename)
-    file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-    file.save(file_path)
-
-    # Preprocess Image
-    features = preprocess_image(image_path=file_path)
-    if features is None:
-        return jsonify({"error": "❌ Image processing failed!"}), 500
-
-    # Make Prediction
-    prediction = model.predict(features)[0]
-
-    # Convert Prediction to Label
-    if isinstance(prediction, str):
-        predicted_category = prediction
-    elif label_encoder:
-        predicted_category = label_encoder.inverse_transform([prediction])[0]
-    else:
-        predicted_category = CATEGORY_MAPPING.get(int(prediction), "Unknown")
-
-    return jsonify({"prediction": predicted_category})
 
 # Run Flask App
 if __name__ == "__main__":
